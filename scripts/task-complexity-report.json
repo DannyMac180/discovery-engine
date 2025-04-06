@@ -1,0 +1,91 @@
+{
+  "meta": {
+    "generatedAt": "2025-04-05T00:53:51.488Z",
+    "tasksAnalyzed": 10,
+    "thresholdScore": 5,
+    "projectName": "Your Project Name",
+    "usedResearch": true
+  },
+  "complexityAnalysis": [
+    {
+      "taskId": 1,
+      "taskTitle": "Setup Motia Framework Environment",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the initialization of the Motia framework into subtasks for setting up environment variables, configuring the state persistence layer, creating folder structures, and implementing a logging mechanism.",
+      "reasoning": "The task involves multiple components such as environment setup, secure key management, and project structure initialization, which require technical expertise and thorough planning."
+    },
+    {
+      "taskId": 2,
+      "taskTitle": "Implement API Input Endpoint (research-starter)",
+      "complexityScore": 8,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "List subtasks for creating the API step, defining JSON input schema, generating unique trace IDs, state management, and event emission.",
+      "reasoning": "The task has high complexity as it involves API creation, schema definition, event-driven architecture, and ensuring robust input validation."
+    },
+    {
+      "taskId": 3,
+      "taskTitle": "Implement Query Generator Step",
+      "complexityScore": 8,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Identify subtasks for listening to events, integrating with OpenAI, designing prompts, parsing responses, and generating events for query results.",
+      "reasoning": "This task requires deep integration with an external API and involves designing effective prompts and handling responses accurately."
+    },
+    {
+      "taskId": 4,
+      "taskTitle": "Implement Exa Search Integration",
+      "complexityScore": 9,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Detail the subtasks for creating the Motia step, integrating the Exa Search API, processing search queries, storing results, and event emission.",
+      "reasoning": "The task's complexity is driven by API integration, handling rate limits, and ensuring efficient storage of search results."
+    },
+    {
+      "taskId": 5,
+      "taskTitle": "Implement Content Extractor Step",
+      "complexityScore": 9,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "Break down the task into steps for fetching content, extracting text, handling various content types, implementing retries, and storing extracted data.",
+      "reasoning": "The task is complex due to variability in web content, need for robust error handling, and ensuring data consistency."
+    },
+    {
+      "taskId": 6,
+      "taskTitle": "Implement Question Brainstormer Step",
+      "complexityScore": 8,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "List subtasks for designing prompts, chunking content, integrating OpenAI, parsing responses, and storing or emitting generated questions.",
+      "reasoning": "Complexity arises from content processing, effective prompt design, and managing OpenAI token limits."
+    },
+    {
+      "taskId": 7,
+      "taskTitle": "Implement Question Judger Step",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Outline subtasks for designing evaluation prompts, scoring questions, calculating overall scores, and storing or emitting results.",
+      "reasoning": "The task is moderately complex, primarily involving structured evaluations and scoring mechanisms."
+    },
+    {
+      "taskId": 8,
+      "taskTitle": "Implement Report Compiler Step",
+      "complexityScore": 7,
+      "recommendedSubtasks": 4,
+      "expansionPrompt": "Break down the task into steps for sorting questions, selecting top results, structuring the report, and emitting the final output.",
+      "reasoning": "Complexity is moderate due to data aggregation, formatting, and ensuring report accuracy."
+    },
+    {
+      "taskId": 9,
+      "taskTitle": "Implement API Output Endpoint (report-retriever)",
+      "complexityScore": 6,
+      "recommendedSubtasks": 3,
+      "expansionPrompt": "Define subtasks for creating the API endpoint, retrieving reports, handling errors, and implementing caching.",
+      "reasoning": "The task is straightforward, focusing on API implementation and efficient data retrieval."
+    },
+    {
+      "taskId": 10,
+      "taskTitle": "Implement End-to-End Flow and Testing",
+      "complexityScore": 10,
+      "recommendedSubtasks": 5,
+      "expansionPrompt": "List subtasks for defining workflows, creating test scripts, setting up monitoring, optimizing performance, and preparing deployment.",
+      "reasoning": "The task is highly complex as it involves integrating and testing all components, ensuring seamless workflow, and deploying the system."
+    }
+  ]
+}

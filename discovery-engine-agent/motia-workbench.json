@@ -1,0 +1,52 @@
+{
+  "the-discovery-engine": {
+    "steps/api.step.ts": {
+      "x": 0,
+      "y": 0
+    },
+    "steps/content-extractor.event.step.ts": {
+      "x": 0,
+      "y": 0
+    },
+    "steps/exa-searcher.event.step.ts": {
+      "x": 0,
+      "y": 0
+    },
+    "steps/noop.step.ts": {
+      "x": 0,
+      "y": 0
+    },
+    "steps/one.step.ts": {
+      "x": 0,
+      "y": 0
+    },
+    "steps/query-generator.event.step.ts": {
+      "x": 0,
+      "y": 0
+    },
+    "steps/question-brainstormer.event.step.ts": {
+      "x": 0,
+      "y": 0
+    },
+    "steps/question-judger.event.step.ts": {
+      "x": 0,
+      "y": 0
+    },
+    "steps/report-compiler.event.step.ts": {
+      "x": 0,
+      "y": 0
+    },
+    "steps/report-retriever.api.step.ts": {
+      "x": 0,
+      "y": 0
+    },
+    "steps/research-starter.api.step.ts": {
+      "x": 0,
+      "y": 0
+    },
+    "steps/two.step.ts": {
+      "x": 0,
+      "y": 0
+    }
+  }
+}

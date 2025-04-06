@@ -1,0 +1,146 @@
+Okay, let's structure the details we've discussed into the PRD format you provided.
+
+## Product Requirements Document: Discovery Engine (MVP)
+
+**Overview**
+
+* **Problem:** Identifying novel, impactful, and potentially cross-disciplinary scientific research questions is a challenging and time-consuming process for researchers and innovators. It requires synthesizing vast amounts of information and spotting non-obvious connections.
+* **Solution:** The Discovery Engine is a backend multi-agent system built on the Motia framework. It automates the process of exploring a seeded topic, gathering relevant information, brainstorming potential research questions using AI, and evaluating those questions based on defined criteria.
+* **Target Audience:** Researchers, R&D teams, scientists, students, and innovators looking for inspiration and new research directions.
+* **Value:** Accelerates the research ideation phase, helps overcome creative blocks, surfaces potentially overlooked research avenues, and provides justified, AI-generated suggestions for further exploration.
+
+**Core Features (MVP Backend)**
+
+1.  **Topic Ingestion:**
+    * *What it does:* Allows a user to submit a starting research topic.
+    * *Why it's important:* Provides the initial seed for the discovery process.
+    * *How it works:* An API endpoint (`/start-research`) accepts a topic string and initiates a new research workflow, returning a unique `traceId`. (Corresponds to `research-starter` step).
+2.  **AI-Powered Query Generation:**
+    * *What it does:* Generates relevant search queries based on the seed topic.
+    * *Why it's important:* Broadens the search beyond the initial topic to gather diverse information.
+    * *How it works:* Uses an OpenAI LLM to analyze the seed topic and create multiple search queries suitable for web search. (Corresponds to `query-generator` step).
+3.  **Targeted Web Search:**
+    * *What it does:* Executes the generated queries using an external search API.
+    * *Why it's important:* Gathers raw information (URLs, titles) from the web related to the queries.
+    * *How it works:* Uses the Exa Search API to find relevant online resources for each generated query. (Corresponds to `exa-searcher` step).
+4.  **Content Extraction:**
+    * *What it does:* Retrieves textual content from the identified web resources.
+    * *Why it's important:* Provides the raw text needed for AI analysis and brainstorming.
+    * *How it works:* Fetches and extracts the main text content from the URLs obtained during the search phase. (Corresponds to `content-extractor` step).
+5.  **AI Research Question Brainstorming:**
+    * *What it does:* Generates potential scientific research questions based on the extracted content and original topic.
+    * *Why it's important:* This is the core ideation step where AI suggests new research paths.
+    * *How it works:* Uses an OpenAI LLM to analyze the aggregated text and brainstorm relevant, insightful questions. (Corresponds to `question-brainstormer` step).
+6.  **AI Research Question Evaluation:**
+    * *What it does:* Scores and ranks the brainstormed questions based on defined criteria.
+    * *Why it's important:* Filters and prioritizes the generated questions, adding a layer of critical assessment.
+    * *How it works:* Uses an OpenAI LLM to evaluate each question against Novelty, Feasibility, Potential Impact, and Relevance Across Fields, providing scores and justifications. (Corresponds to `question-judger` step).
+7.  **Report Compilation:**
+    * *What it does:* Gathers the top-evaluated questions and their justifications into a structured format.
+    * *Why it's important:* Presents the final output in a clear and usable way.
+    * *How it works:* Formats the highest-scoring questions, scores, and justifications into a JSON report associated with the `traceId`. (Corresponds to `report-compiler` step).
+8.  **Report Retrieval:**
+    * *What it does:* Allows the user to retrieve the final research question report.
+    * *Why it's important:* Delivers the results of the discovery process to the user.
+    * *How it works:* An API endpoint (`/report/{traceId}`) allows users to fetch the generated report using the unique `traceId`. (Corresponds to `report-retriever` step).
+
+**User Experience (MVP Backend)**
+
+* **User Personas:** Researchers, PhD students, corporate R&D professionals, science enthusiasts.
+* **Key User Flows (API):**
+    1.  User sends POST request to `/start-research` with `{"seed_topic": "..."}`.
+    2.  User receives `{"traceId": "..."}` in response.
+    3.  User periodically (or after a notified completion, if implemented later) sends GET request to `/report/{traceId}`.
+    4.  User receives the JSON report containing evaluated research questions or an indication that the process is still running.
+* **UI/UX Considerations:** None for MVP (API-only). Future enhancements could include a web interface for submitting topics, viewing progress, and Browse reports.
+
+**Technical Architecture**
+
+* **System Components:**
+    * Motia Framework: Orchestrates the workflow using Steps, Events, and Flows.
+    * Individual Motia Steps (TypeScript/Python/Ruby): Implementing the logic for each core feature (as detailed above).
+    * State Management: Motia's built-in state persistence, keyed by `traceId`.
+    * API Endpoints: Motia `api` steps for `/start-research` and `/report/{traceId}`.
+* **Data Models:**
+    * `topic.seeded` event payload
+    * `queries.generated` event payload
+    * `search_results.obtained` event payload
+    * `content.extracted` event payload
+    * `questions.generated` event payload
+    * `questions.evaluated` event payload
+    * `report.ready` event payload
+    * State data associated with `traceId` (seed topic, queries, results, content, questions, report).
+    * Input/Output JSON structures for API endpoints.
+* **APIs and Integrations:**
+    * Internal: Motia eventing system between steps.
+    * External:
+        * OpenAI API (for query generation, brainstorming, evaluation).
+        * Exa Search API (for web searching).
+        * (Potentially) Web content fetching library/service.
+* **Infrastructure Requirements (MVP):**
+    * Environment to run the Motia framework and its steps (e.g., Node.js/Python/Ruby runtime, potentially containerized).
+    * Credentials/API keys management for OpenAI and Exa Search.
+    * State persistence backend compatible with Motia (details depend on chosen Motia configuration).
+
+**Development Roadmap**
+
+* **MVP Requirements:**
+    * Implement the 8 Motia steps (`research-starter` to `report-retriever`) with basic logic.
+    * Define and implement the event payloads for communication.
+    * Integrate OpenAI API calls with initial prompt engineering for query generation, brainstorming, and evaluation.
+    * Integrate Exa Search API for the search step.
+    * Implement basic state management using `traceId`.
+    * Set up the two API endpoints for input and output.
+    * Basic error handling within steps (e.g., API failures).
+* **Future Enhancements (Post-MVP):**
+    * **Iterative Research:** Allow the engine to refine queries or dig deeper based on initial findings.
+    * **Improved Evaluation:** More sophisticated LLM prompting or fine-tuning for question evaluation. Allow user feedback on question quality.
+    * **Source Tracking:** Link final questions back to specific source content/URLs.
+    * **Wider Integrations:** Support different search engines, LLMs, or academic databases (e.g., PubMed, ArXiv).
+    * **Input Flexibility:** Accept inputs beyond topics, like research paper abstracts or URLs.
+    * **User Interface:** Web-based UI for easier interaction.
+    * **Notifications:** Alert users when reports are ready.
+    * **Scalability & Performance:** Optimize steps, parallelize tasks where possible, improve infrastructure.
+    * **Advanced Error Handling & Monitoring:** Robust logging and alerting.
+
+**Logical Dependency Chain (MVP Focus)**
+
+1.  **Foundation:** Set up Motia framework environment. Configure basic event bus and state management. Securely manage API keys.
+2.  **Input/Output:** Implement `research-starter` (API input) and `report-retriever` (API output) steps first. This provides the basic interaction points. Define the final `final_report` structure early.
+3.  **Core Flow (Sequential Build):**
+    * Implement `query-generator` (requires OpenAI integration). Define `topic.seeded` and `queries.generated` events.
+    * Implement `exa-searcher` (requires Exa integration). Define `search_results.obtained` event.
+    * Implement `content-extractor` (requires web scraping logic). Define `content.extracted` event.
+    * Implement `question-brainstormer` (requires OpenAI). Define `questions.generated` event.
+    * Implement `question-judger` (requires OpenAI). Define `questions.evaluated` event.
+    * Implement `report-compiler`. Define `report.ready` event.
+4.  **End-to-End Testing:** Once all steps are linked via events, perform end-to-end tests starting from topic submission to report retrieval.
+
+*This order focuses on building the chain sequentially while ensuring the entry and exit points are defined early for clarity.*
+
+**Risks and Mitigations**
+
+* **Technical Challenges:**
+    * *Risk:* Reliability of web content extraction varies greatly across sites.
+    * *Mitigation:* Use robust libraries, implement retries, handle failures gracefully (skip problematic sources), focus extraction on main content areas.
+    * *Risk:* Quality and consistency of LLM outputs (queries, questions, evaluations) can fluctuate.
+    * *Mitigation:* Careful prompt engineering, potentially using few-shot examples, temperature/parameter tuning. For MVP, accept inherent variability. Log prompts/outputs for later analysis.
+* **Figuring out the MVP:**
+    * *Risk:* Scope creep – adding features beyond the core MVP flow.
+    * *Mitigation:* Strictly adhere to the 8 defined steps and basic API interaction for MVP. Defer all other features (UI, iterations, advanced evaluation) to "Future Enhancements".
+    * *Risk:* Defining effective LLM prompts for evaluation criteria is complex.
+    * *Mitigation:* Start with clear, simple prompts based on the defined criteria. Accept "good enough" for MVP and plan for iterative refinement based on results.
+* **Resource Constraints:**
+    * *Risk:* Costs associated with OpenAI and Exa Search API calls.
+    * *Mitigation:* Implement usage logging. Set budget alerts if possible. For MVP development, use potentially cheaper models or limit the number of queries/results processed per run.
+    * *Risk:* Time required for development and prompt tuning.
+    * *Mitigation:* Focus on the sequential dependency chain. Reuse code/prompts where possible. Prioritize functional flow over perfect output quality for the initial MVP.
+
+**Appendix**
+
+* Motia Framework Documentation: [`motia.txt`](motia.txt) (from user upload), [https://motiadev.com](https://motiadev.com), [https://github.com/motiadev/motia](https://github.com/motiadev/motia)
+* OpenAI API Documentation: [https://platform.openai.com/docs](https://platform.openai.com/docs)
+* Exa Search API Documentation: [https://exa.ai/docs](https://www.google.com/search?q=https://exa.ai/docs)
+* Detailed Step/Event Definitions: (Refer to previous conversation turn for specifics)
+
+This PRD provides a detailed plan for the Discovery Engine MVP backend. Let me know if you'd like to adjust or refine any section!
