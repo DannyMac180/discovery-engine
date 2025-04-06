@@ -36,20 +36,33 @@ interface FinalReport {
   };
 }
 
+// Define the expected context shape for this event step
+interface CustomEventContext {
+  logger: any; // Replace 'any' with specific Motia Logger type if known/available
+  state: {
+    get: <T>(key: string) => Promise<T | undefined>; // Add type hint for get
+    set: (key: string, value: any) => Promise<void>;
+  };
+  event: {
+    emit: (eventName: string, payload: any) => Promise<void>;
+  };
+  secrets: { [key: string]: string }; // Assuming secrets are key-value pairs
+}
+
 // Define the step configuration
 export const config = {
   type: 'event',
   name: 'report-compiler',
   description: 'Compiles the top-evaluated research questions into a final report.',
-  subscribes: ['content.extracted', 'questions.judged'],
+  subscribes: ['questions.judged'], // Corrected: Only subscribe to the final prerequisite event
   emits: ['report.generated'],
   flows: ['the-discovery-engine'],
 };
 
 // The handler function for the event step
-export const handler: StepHandler<typeof config> = async (payload, context) => {
+export const handler: StepHandler<typeof config> = async (payload: QuestionsEvaluatedPayload, context: CustomEventContext) => {
   const { logger, state, event } = context;
-  const { traceId, evaluatedQuestions } = payload as QuestionsEvaluatedPayload;
+  const { traceId, evaluatedQuestions } = payload;
   const TOP_N_QUESTIONS = 5; // Number of top questions to include in the report
 
   logger.info(`[${traceId}] Received 'questions.evaluated' event with ${evaluatedQuestions.length} questions. Compiling report.`);
@@ -93,15 +106,17 @@ export const handler: StepHandler<typeof config> = async (payload, context) => {
     await state.set(reportKey, finalReport);
     logger.debug(`[${traceId}] Stored final report in state at key: ${reportKey}`);
 
-    // 6. Emit the 'report.ready' event
+    // 6. Emit the 'report.generated' event
     await event.emit('report.generated', {
       traceId: traceId,
       report: finalReport,
     });
-    logger.info(`[${traceId}] Emitted 'report.generated' event with top ${topQuestions.length} questions.`);
+    logger.info(`[${payload.traceId}] Emitted 'report.generated' event.`);
 
-  } catch (error) {
-    logger.error(`[${traceId}] Error compiling report: ${error.message}`);
-    await event.emit('workflow.error', { traceId, step: config.name, error: `Error compiling report: ${error.message}` });
+  } catch (error: unknown) {
+    let errorMessage = 'Unknown error during report compilation';
+    if (error instanceof Error) errorMessage = error.message;
+    logger.error(`[${traceId}] Error in report-compiler step: ${errorMessage}`);
+    await event.emit('workflow.error', { traceId: traceId, step: config.name, error: errorMessage });
   }
 };

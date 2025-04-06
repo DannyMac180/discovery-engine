@@ -6,11 +6,11 @@
     },
     "steps/content-extractor.event.step.ts": {
       "x": 0,
-      "y": 0
+      "y": 40
     },
     "steps/exa-searcher.event.step.ts": {
-      "x": 0,
-      "y": 0
+      "x": 782,
+      "y": 432
     },
     "steps/noop.step.ts": {
       "x": 0,
@@ -21,28 +21,28 @@
       "y": 0
     },
     "steps/query-generator.event.step.ts": {
-      "x": 0,
-      "y": 0
+      "x": 771,
+      "y": 256
     },
     "steps/question-brainstormer.event.step.ts": {
-      "x": 0,
-      "y": 0
+      "x": 753.6621495911668,
+      "y": 649.1681662502467
     },
     "steps/question-judger.event.step.ts": {
-      "x": 0,
-      "y": 0
+      "x": 777.5,
+      "y": 864
     },
     "steps/report-compiler.event.step.ts": {
-      "x": 0,
-      "y": 0
+      "x": 777.5,
+      "y": 1114
     },
     "steps/report-retriever.api.step.ts": {
-      "x": 0,
-      "y": 0
+      "x": 288,
+      "y": -183.80971206271624
     },
     "steps/research-starter.api.step.ts": {
-      "x": 0,
-      "y": 0
+      "x": 698,
+      "y": 10
     },
     "steps/two.step.ts": {
       "x": 0,

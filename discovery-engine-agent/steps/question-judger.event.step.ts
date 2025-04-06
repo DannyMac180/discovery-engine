@@ -24,12 +24,25 @@ interface EvaluatedQuestion {
   error?: string; // Optional field for evaluation errors for this specific question
 }
 
+// Define the expected context shape for this event step
+interface CustomEventContext {
+  logger: any; // Replace 'any' with specific Motia Logger type if known/available
+  state: {
+    get: <T>(key: string) => Promise<T | undefined>; // Add type hint for get
+    set: (key: string, value: any) => Promise<void>;
+  };
+  event: {
+    emit: (eventName: string, payload: any) => Promise<void>;
+  };
+  secrets: { [key: string]: string }; // Assuming secrets are key-value pairs
+}
+
 // Define the step configuration
 export const config = {
   type: 'event',
   name: 'question-judger',
   description: 'Evaluates brainstormed research questions based on predefined criteria using OpenAI.',
-  subscribes: ['questions.brainstormed'],
+  subscribes: ['questions.generated'],
   emits: ['questions.judged'],
   flows: ['the-discovery-engine'],
 };
@@ -38,16 +51,15 @@ export const config = {
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // The handler function for the event step
-export const handler: StepHandler<typeof config> = async (payload, context) => {
+export const handler: StepHandler<typeof config> = async (payload: QuestionsGeneratedPayload, context: CustomEventContext) => {
   const { logger, state, event, secrets } = context;
-  const { traceId, questions } = payload as QuestionsGeneratedPayload;
 
-  logger.info(`[${traceId}] Received 'questions.generated' event with ${questions.length} questions. Starting evaluation.`);
+  logger.info(`[${payload.traceId}] Received 'questions.generated' event with ${payload.questions.length} questions. Starting evaluation.`);
 
   const apiKey = secrets.OPENAI_API_KEY;
   if (!apiKey) {
-    logger.error(`[${traceId}] OpenAI API key is missing. Cannot perform question evaluation.`);
-    await event.emit('workflow.error', { traceId, step: config.name, error: 'Missing OpenAI API Key' });
+    logger.error(`[${payload.traceId}] OpenAI API key is missing. Cannot perform question evaluation.`);
+    await event.emit('workflow.error', { traceId: payload.traceId, step: config.name, error: 'Missing OpenAI API Key' });
     return;
   }
 
@@ -56,18 +68,18 @@ export const handler: StepHandler<typeof config> = async (payload, context) => {
 
   try {
     // Retrieve the seed topic for context
-    const seedTopicKey = `${traceId}:seed_topic`;
+    const seedTopicKey = `${payload.traceId}:seed_topic`;
     const seedTopic = await state.get<string>(seedTopicKey);
     if (!seedTopic) {
-      logger.warn(`[${traceId}] Seed topic not found in state (key: ${seedTopicKey}). Evaluation context will be limited.`);
+      logger.warn(`[${payload.traceId}] Seed topic not found in state (key: ${seedTopicKey}). Evaluation context will be limited.`);
       // Proceed without topic context, or throw error?
       // Let's proceed but the quality might be lower.
     }
 
     // Process each question individually for evaluation
-    for (const question of questions) {
+    for (const question of payload.questions) {
       try {
-        logger.debug(`[${traceId}] Evaluating question: "${question}"`);
+        logger.debug(`[${payload.traceId}] Evaluating question: "${question}"`);
 
         // Design the evaluation prompt
         const systemPrompt = `You are an expert evaluator of scientific research questions. Analyze the given question based on the provided criteria. Respond ONLY with a valid JSON object containing keys: "novelty", "feasibility", "impact", and "crossDisciplinary". Each key should map to an object with "score" (an integer between 1 and 10) and "justification" (a brief string explaining the score).`;
@@ -110,10 +122,12 @@ Return ONLY the JSON object as described.`;
           if (!evaluationResult.novelty?.score || !evaluationResult.feasibility?.score || !evaluationResult.impact?.score || !evaluationResult.crossDisciplinary?.score) {
               throw new Error('Parsed JSON is missing required evaluation fields or scores.');
           }
-        } catch (parseError) {
-          logger.error(`[${traceId}] Failed to parse JSON evaluation for question "${question}": ${parseError}`);
-          logger.debug(`[${traceId}] Raw OpenAI Response: ${responseContent}`);
-          throw new Error(`Failed to parse OpenAI JSON evaluation: ${parseError.message}`);
+        } catch (parseError: unknown) {
+          let errorMessage = 'Unknown parsing error';
+          if (parseError instanceof Error) errorMessage = parseError.message;
+          logger.error(`[${payload.traceId}] Failed to parse JSON evaluation for question "${question}": ${errorMessage}`);
+          logger.debug(`[${payload.traceId}] Raw OpenAI Response: ${responseContent}`);
+          throw new Error(`Failed to parse OpenAI JSON evaluation: ${errorMessage}`);
         }
 
         // Calculate overall score (simple average for now)
@@ -128,13 +142,15 @@ Return ONLY the JSON object as described.`;
           overallScore: parseFloat(overallScore.toFixed(2)), // Keep 2 decimal places
         });
 
-        logger.debug(`[${traceId}] Successfully evaluated question: "${question}" (Overall: ${overallScore.toFixed(2)})`);
+        logger.debug(`[${payload.traceId}] Successfully evaluated question: "${question}" (Overall: ${overallScore.toFixed(2)})`);
 
         // Add a small delay to avoid hitting rate limits if evaluating many questions quickly
         await delay(500); // 500ms delay
 
-      } catch (evalError) {
-        logger.error(`[${traceId}] Failed to evaluate question "${question}": ${evalError.message}`);
+      } catch (evalError: unknown) {
+        let errorMessage = 'Unknown evaluation error';
+        if (evalError instanceof Error) errorMessage = evalError.message;
+        logger.error(`[${payload.traceId}] Failed to evaluate question "${question}": ${errorMessage}`);
         // Add the question with an error flag/message
         evaluatedQuestions.push({
           question: question,
@@ -143,27 +159,29 @@ Return ONLY the JSON object as described.`;
           impact: { score: 0, justification: 'Evaluation Error' },
           crossDisciplinary: { score: 0, justification: 'Evaluation Error' },
           overallScore: 0,
-          error: evalError.message,
+          error: errorMessage,
         });
       }
     }
 
-    logger.info(`[${traceId}] Finished evaluating ${evaluatedQuestions.length} questions. ${evaluatedQuestions.filter(q => q.error).length} failed.`);
+    logger.info(`[${payload.traceId}] Finished evaluating ${evaluatedQuestions.length} questions. ${evaluatedQuestions.filter(q => q.error).length} failed.`);
 
     // Store the evaluated questions in state
-    const evaluatedKey = `${traceId}:evaluated_questions`;
+    const evaluatedKey = `${payload.traceId}:evaluated_questions`;
     await state.set(evaluatedKey, evaluatedQuestions);
-    logger.debug(`[${traceId}] Stored evaluated questions in state at key: ${evaluatedKey}`);
+    logger.debug(`[${payload.traceId}] Stored evaluated questions in state at key: ${evaluatedKey}`);
 
     // Emit the 'questions.evaluated' event
     await event.emit('questions.judged', {
-      traceId: traceId,
+      traceId: payload.traceId,
       evaluatedQuestions: evaluatedQuestions,
     });
-    logger.info(`[${traceId}] Emitted 'questions.judged' event.`);
+    logger.info(`[${payload.traceId}] Emitted 'questions.judged' event.`);
 
-  } catch (error) {
-    logger.error(`[${traceId}] Critical error during question evaluation process: ${error.message}`);
-    await event.emit('workflow.error', { traceId, step: config.name, error: `Critical error in evaluation step: ${error.message}` });
+  } catch (error: unknown) {
+    let errorMessage = 'Unknown critical error';
+    if (error instanceof Error) errorMessage = error.message;
+    logger.error(`[${payload.traceId}] Critical error during question evaluation process: ${errorMessage}`);
+    await event.emit('workflow.error', { traceId: payload.traceId, step: config.name, error: `Critical error in evaluation step: ${errorMessage}` });
   }
 };

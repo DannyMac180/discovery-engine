@@ -1,4 +1,25 @@
-import { StepHandler } from 'motia';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Explicitly load .env from the project root relative to this file's location
+const projectRoot = path.resolve(__dirname, '..', '..'); // Assumes steps are one level down from root
+const envPath = path.join(projectRoot, '.env');
+const dotenvResult = dotenv.config({ path: envPath });
+
+// Log dotenv loading status (do this *before* logger is destructured from context)
+console.log(`[dotenv-debug] Attempting to load .env from: ${envPath}`);
+if (dotenvResult.error) {
+  console.error(`[dotenv-debug] Error loading .env file: ${dotenvResult.error.message}`);
+} else if (dotenvResult.parsed) {
+  console.log(`[dotenv-debug] .env file loaded successfully. Found keys: ${Object.keys(dotenvResult.parsed).join(', ')}`);
+  if (!dotenvResult.parsed.OPENAI_API_KEY) {
+    console.warn('[dotenv-debug] OPENAI_API_KEY was NOT found in the parsed .env file.');
+  }
+} else {
+  console.warn('[dotenv-debug] .env file loaded but dotenvResult.parsed is empty.');
+}
+
+import { StepHandler } from '@motiadev/core';
 import OpenAI from 'openai';
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { z } from 'zod';
@@ -22,16 +43,23 @@ export const config = {
 
 // The handler function for the event step
 export const handler: StepHandler<typeof config> = async (payload, context) => {
-  const { logger, state, event, secrets } = context;
+  // Destructure context immediately, including emit for event steps
+  const { logger, state, emit } = context;
   const { traceId, topic } = payload as TopicSeededPayload;
 
   logger.info(`[${traceId}] Received 'topic.seeded' event for topic: "${topic}"`);
 
-  const apiKey = secrets.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY; // Get key from process.env
   if (!apiKey) {
-    logger.error(`[${traceId}] OpenAI API key is missing. Check environment variables and motia.config.ts secrets.`);
+    logger.error(`[${traceId}] OpenAI API key is missing. Ensure OPENAI_API_KEY environment variable is set and .env is loaded.`);
+    logger.debug(`[${traceId}] Value of process.env.OPENAI_API_KEY at check: ${process.env.OPENAI_API_KEY}`);
     // Optional: Emit an error event or handle differently
-    await event.emit('workflow.error', { traceId, step: config.name, error: 'Missing OpenAI API Key' });
+    // Check if emit exists before emitting (using the destructured emit)
+    if (emit && typeof emit === 'function') {
+      await emit({ topic: 'workflow.error', data: { traceId, step: config.name, error: 'Missing OpenAI API Key' } });
+    } else {
+      logger.error(`[${traceId}] Could not emit workflow.error because emit function is unavailable in context.`);
+    }
     return; // Stop processing if key is missing
   }
 
@@ -106,21 +134,26 @@ export const handler: StepHandler<typeof config> = async (payload, context) => {
     await state.set(stateKey, generatedQueries);
     logger.debug(`[${traceId}] Stored generated queries in state at key: ${stateKey}`);
 
-    // Emit the 'queries.generated' event
-    await event.emit('queries.generated', {
-      traceId: traceId,
-      queries: generatedQueries,
+    // Emit the 'queries.generated' event using the { topic, data } structure
+    await emit({ 
+      topic: 'queries.generated', 
+      data: { traceId: traceId, queries: generatedQueries },
     });
-    logger.info(`[${traceId}] Emitted 'queries.generated' event.`);
+    logger.debug(`[${traceId}] Emitted 'queries.generated' event.`);
 
-  } catch (error: any) {
-    logger.error(`[${traceId}] Error during query generation: ${error.message}`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`[${traceId}] Error during query generation: ${errorMessage}`);
     logger.error(`[${traceId}] Full Error Object:`, error);
     // Optional: Emit an error event
-    await event.emit('workflow.error', {
-      traceId,
-      step: config.name,
-      error: error.message,
-    });
+    // Check if emit exists before emitting
+    if (emit && typeof emit === 'function') { 
+      await emit({ 
+        topic: 'workflow.error', 
+        data: { traceId, step: config.name, error: errorMessage },
+      });
+    } else {
+      logger.error(`[${traceId}] Could not emit workflow.error because emit function is unavailable in context.`);
+    }
   }
 };

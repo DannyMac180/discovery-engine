@@ -39,7 +39,9 @@ interface ReportRetrieverInput {
 // Define context shape (can reuse ApiContext from research-starter or define specifically)
 interface ApiContext {
   logger: any;
-  state: any;
+  state: {
+    get: <T>(key: string) => Promise<T | undefined>; // Add type hint for get
+  };
   request: any; // Add request property to ApiContext
 }
 
@@ -55,7 +57,7 @@ export const config = {
 };
 
 // The handler function for the API step
-export const handler = async (input: ReportRetrieverInput, context: ApiContext) => {
+export const handler: StepHandler<typeof config> = async (input: ReportRetrieverInput, context: ApiContext) => {
   const { logger, state } = context;
 
   logger.debug('Report retriever API handler invoked');

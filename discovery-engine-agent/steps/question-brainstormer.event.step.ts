@@ -18,12 +18,25 @@ interface ExtractedContent {
   error?: string;
 }
 
+// Define the expected context shape for this event step
+interface CustomEventContext {
+  logger: any; // Replace 'any' with specific Motia Logger type if known/available
+  state: {
+    get: <T>(key: string) => Promise<T | undefined>; // Add type hint for get
+    set: (key: string, value: any) => Promise<void>;
+  };
+  event: {
+    emit: (eventName: string, payload: any) => Promise<void>;
+  };
+  secrets: { [key: string]: string }; // Assuming secrets are key-value pairs
+}
+
 // Define the step configuration
 export const config = {
   type: 'event',
   name: 'question-brainstormer',
   description: 'Analyzes extracted web content and seed topic to brainstorm research questions using OpenAI.',
-  subscribes: ['content.extracted'],
+  subscribes: ['exa.results.received'],
   emits: ['questions.generated'],
   flows: ['the-discovery-engine'],
 };
@@ -35,9 +48,9 @@ const truncateText = (text: string, maxLength: number): string => {
 };
 
 // The handler function for the event step
-export const handler: StepHandler<typeof config> = async (payload, context) => {
+export const handler: StepHandler<typeof config> = async (payload: ContentExtractedPayload, context: CustomEventContext) => {
   const { logger, state, event, secrets } = context;
-  const { traceId } = payload as ContentExtractedPayload;
+  const { traceId } = payload;
 
   logger.info(`[${traceId}] Received 'content.extracted' event. Starting question brainstorming.`);
 
@@ -151,10 +164,12 @@ Based on the seed topic and the context above, generate 5-10 novel, impactful, a
 
       logger.info(`[${traceId}] Successfully generated ${generatedQuestions.length} research questions.`);
 
-    } catch (parseError) {
-      logger.error(`[${traceId}] Failed to parse JSON response from OpenAI: ${parseError}`);
+    } catch (parseError: unknown) {
+      let errorMessage = 'Unknown parsing error';
+      if (parseError instanceof Error) errorMessage = parseError.message;
+      logger.error(`[${traceId}] Failed to parse JSON response from OpenAI: ${errorMessage}`);
       logger.debug(`[${traceId}] Raw OpenAI Response: ${responseContent}`);
-      throw new Error(`Failed to parse OpenAI JSON response: ${parseError.message}`);
+      throw new Error(`Failed to parse OpenAI JSON response: ${errorMessage}`);
     }
 
     // 6. Store generated questions in state
@@ -169,8 +184,10 @@ Based on the seed topic and the context above, generate 5-10 novel, impactful, a
     });
     logger.info(`[${traceId}] Emitted 'questions.generated' event.`);
 
-  } catch (error) {
-    logger.error(`[${traceId}] Error in question-brainstormer step: ${error.message}`);
-    await event.emit('workflow.error', { traceId, step: config.name, error: error.message });
+  } catch (error: unknown) {
+    let errorMessage = 'Unknown error in question-brainstormer';
+    if (error instanceof Error) errorMessage = error.message;
+    logger.error(`[${traceId}] Error in question-brainstormer step: ${errorMessage}`);
+    await event.emit('workflow.error', { traceId, step: config.name, error: errorMessage });
   }
 };
