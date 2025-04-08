@@ -37,7 +37,7 @@ export const config = {
   name: 'query-generator',
   description: 'Generates search queries based on a seed topic using OpenAI.',
   subscribes: ['topic.seeded'], // Listen only for the initial topic
-  emits: ['queries.generated'], // Emits this event upon completion
+  emits: ['queries.generated', 'workflow.error'], // Emits this event upon completion
   flows: ['the-discovery-engine'],
 };
 

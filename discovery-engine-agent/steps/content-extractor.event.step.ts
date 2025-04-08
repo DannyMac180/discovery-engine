@@ -58,9 +58,6 @@ export const handler: StepHandler<typeof config> = async (payload: SearchResults
   const RETRY_DELAY = 1000; // 1 second delay between retries
   const FETCH_TIMEOUT = 15000; // 15 seconds
 
-  // Dynamically import node-fetch
-  const fetch = (await import('node-fetch')).default;
-
   for (const result of payload.results) { // Switched back to sequential for simplicity
     if (!result.url) {
       logger.warn(`[${payload.traceId}] Skipping result with missing URL.`);
@@ -79,6 +76,7 @@ export const handler: StepHandler<typeof config> = async (payload: SearchResults
       try {
         logger.debug(`[${payload.traceId}] Fetching URL (Attempt ${attempt}/${MAX_RETRIES + 1}): ${result.url}`);
 
+        const fetch = (await import('node-fetch')).default;
         const response = await fetch(result.url, {
           signal: controller.signal, // Attach the AbortController signal
           headers: {

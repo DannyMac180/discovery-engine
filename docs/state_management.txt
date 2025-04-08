@@ -1,0 +1,198 @@
+---
+description: State management between steps
+globs: 
+alwaysApply: false
+---
+# Motia State Management
+
+## Core Concepts
+
+State management in Motia provides:
+- Zero-config in-memory storage
+- Flexible storage adapters (Memory, File, Redis)
+- Automatic state cleanup with TTL
+- Flow-level isolation using traceId
+
+## Basic Usage
+
+```typescript
+export const handler = async (input, { state, traceId }: FlowContext) => {
+  // Store data
+  await state.set(traceId, 'user', { name: 'Alice' });
+  
+  // Retrieve data
+  const user = await state.get(traceId, 'user');
+  
+  // Delete specific data
+  await state.delete(traceId, 'user');
+  
+  // Clear all flow state
+  await state.clear(traceId);
+};
+```
+
+```python
+async def handler(input, ctx): # ctx is the context object
+    trace_id = ctx.trace_id # Access traceId from context
+ 
+    # Store state (using traceId as scope)
+    await ctx.state.set(trace_id, 'booking', { 
+        'customer': input.customer,
+        'venue': input.venue
+    })
+ 
+    # Retrieve state (using traceId as scope)
+    booking = await ctx.state.get(trace_id, 'booking') 
+ 
+    # Delete specific state (using traceId as scope)
+    await ctx.state.delete(trace_id, 'booking') 
+ 
+    # Clear all state (using traceId as scope)
+    await ctx.state.clear(trace_id) 
+```
+
+```ruby
+  def handler(input, context) # context is the context object
+  trace_id = context.trace_id # Access traceId from context
+ 
+  # Store state (using traceId as scope)
+  context.state.set(trace_id, 'booking', { 
+    customer: input.customer,
+    venue: input.venue
+  })
+ 
+  # Retrieve state (using traceId as scope)
+  booking = context.state.get(trace_id, 'booking') 
+ 
+  # Delete specific state
+  context.state.delete(trace_id, 'booking') 
+ 
+  # Clear all state (using traceId as scope)
+  context.state.clear(trace_id) 
+end
+```
+
+## State Methods
+
+| Method  | Usage                                    |
+|---------|------------------------------------------|
+| get     | `state.get(traceId, key)`               |
+| set     | `state.set(traceId, key, value)`        |
+| delete  | `state.delete(traceId, key)`            |
+| clear   | `state.clear(traceId)`                  |
+
+## Storage Adapters
+
+To configure a different state adapter, modify the config.yml file in your project root:
+
+my-motia-project/
+├── config.yml
+└── steps/
+    ├── step-1.ts
+    └── step-2.ts
+
+### Memory (Default)
+```yaml
+state:
+  adapter: memory
+```
+
+### File
+```yaml
+state:
+  adapter: file
+  path: '.motia/state.json'
+```
+
+### Redis
+```yaml
+state:
+  adapter: redis
+  host: localhost
+  port: 6379
+  password: optional
+  ttl: 3600  # Optional: 1 hour TTL
+```
+
+## Best Practices
+
+1. Type Safety
+```typescript
+interface CustomerData {
+  name: string;
+  email: string;
+}
+ 
+interface VenueData {
+  id: string;
+  capacity: number;
+}
+ 
+type BookingState = {
+  customer: CustomerData;
+  venue: VenueData;
+  status: 'pending' | 'confirmed';
+}
+ 
+const booking = await state.get<BookingState>(traceId, 'booking')
+```
+
+```python
+from dataclasses import dataclass
+from typing import Literal
+ 
+@dataclass
+class CustomerData:
+    name: str
+    email: str
+ 
+@dataclass
+class VenueData:
+    id: str
+    capacity: int
+ 
+@dataclass
+class BookingState:
+    customer: CustomerData
+    venue: VenueData
+    status: Literal['pending', 'confirmed']
+ 
+booking = await state.get(traceId, 'booking')
+```
+
+2. Hierarchical Keys
+```typescript
+// Good
+await state.set(traceId, 'booking.customer', data);
+await state.set(traceId, 'booking.venue', venue);
+
+// Avoid
+await state.set(traceId, 'customerData', data);
+await state.set(traceId, 'venueData', venue);
+```
+
+3. Cleanup
+```typescript
+try {
+  await processData();
+} finally {
+  await state.clear(traceId);
+}
+```
+
+```python
+async def handler(input, ctx):
+    trace_id = ctx.trace_id
+    try:
+        await process_booking(input)
+        # Clean up specific keys
+        await ctx.state.delete(trace_id, 'booking.customer')
+        # Or clean everything
+        await ctx.state.clear(trace_id)
+    except Exception as error:
+        # Handle errors
+        pass
+```
+
+## Additional Docs
+State Management: https://motia.dev/docs/concepts/state-management

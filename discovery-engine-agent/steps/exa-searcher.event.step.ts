@@ -45,7 +45,7 @@ export const config = {
   name: 'exa-searcher',
   description: 'Searches Exa based on generated queries.',
   subscribes: ['queries.generated'],
-  emits: ['search.results.processed'],
+  emits: ['search_results.obtained'],
   flows: ['the-discovery-engine'],
 };
 
@@ -133,10 +133,13 @@ export const handler: StepHandler<typeof config> = async (payload, context) => {
   await state.set(stateKey, allResults);
   logger.debug(`[${traceId}] Stored ${allResults.length} Exa search results in state at key: ${stateKey}`);
 
-  // Emit the 'search.results.processed' event using the { topic, data } structure
+  // Emit the 'search_results.obtained' event using the { topic, data } structure
+  const emitPayload = { traceId, results: allResults, errors: errors }; 
+  const eventName = 'search_results.obtained'; 
+  logger.debug(`[${traceId}] Preparing to emit '${eventName}' with traceId: ${traceId}`);
   await emit({ 
-    topic: 'search.results.processed', 
-    data: { traceId, results: allResults },
+    topic: eventName, 
+    data: emitPayload,
   });
-  logger.debug(`[${traceId}] Emitted 'search.results.processed' event.`);
+  logger.debug(`[${traceId}] Emitted '${eventName}' event.`);
 };

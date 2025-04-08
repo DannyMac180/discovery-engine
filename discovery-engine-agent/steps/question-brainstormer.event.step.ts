@@ -1,4 +1,25 @@
-import { StepHandler } from 'motia';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Explicitly load .env from the project root relative to this file's location
+const projectRoot = path.resolve(__dirname, '..', '..'); // Assumes steps are one level down from root
+const envPath = path.join(projectRoot, '.env');
+const dotenvResult = dotenv.config({ path: envPath });
+
+// Log dotenv loading status (do this *before* logger is destructured from context)
+console.log(`[dotenv-debug] [question-brainstormer] Attempting to load .env from: ${envPath}`);
+if (dotenvResult.error) {
+  console.error(`[dotenv-debug] [question-brainstormer] Error loading .env file: ${dotenvResult.error.message}`);
+} else if (dotenvResult.parsed) {
+  console.log(`[dotenv-debug] [question-brainstormer] .env file loaded successfully. Found keys: ${Object.keys(dotenvResult.parsed).join(', ')}`);
+  if (!dotenvResult.parsed.OPENAI_API_KEY) {
+    console.warn('[dotenv-debug] [question-brainstormer] OPENAI_API_KEY was NOT found in the parsed .env file.');
+  }
+} else {
+  console.warn('[dotenv-debug] [question-brainstormer] .env file loaded but dotenvResult.parsed is empty.');
+}
+
+import { StepHandler } from '@motiadev/core'; // Correct import for StepHandler
 import OpenAI from 'openai';
 
 // Define the expected input payload from the 'content.extracted' event
@@ -28,7 +49,6 @@ interface CustomEventContext {
   event: {
     emit: (eventName: string, payload: any) => Promise<void>;
   };
-  secrets: { [key: string]: string }; // Assuming secrets are key-value pairs
 }
 
 // Define the step configuration
@@ -36,7 +56,7 @@ export const config = {
   type: 'event',
   name: 'question-brainstormer',
   description: 'Analyzes extracted web content and seed topic to brainstorm research questions using OpenAI.',
-  subscribes: ['exa.results.received'],
+  subscribes: ['content.extracted'],
   emits: ['questions.generated'],
   flows: ['the-discovery-engine'],
 };
@@ -49,14 +69,14 @@ const truncateText = (text: string, maxLength: number): string => {
 
 // The handler function for the event step
 export const handler: StepHandler<typeof config> = async (payload: ContentExtractedPayload, context: CustomEventContext) => {
-  const { logger, state, event, secrets } = context;
+  const { logger, state, event } = context;
   const { traceId } = payload;
 
   logger.info(`[${traceId}] Received 'content.extracted' event. Starting question brainstorming.`);
 
-  const apiKey = secrets.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    logger.error(`[${traceId}] OpenAI API key is missing. Check environment variables and motia.config.ts secrets.`);
+    logger.error(`[${traceId}] OpenAI API key is missing. Check environment variables and .env file.`);
     await event.emit('workflow.error', { traceId, step: config.name, error: 'Missing OpenAI API Key' });
     return;
   }
@@ -65,19 +85,32 @@ export const handler: StepHandler<typeof config> = async (payload: ContentExtrac
     // 1. Retrieve necessary data from state
     const seedTopicKey = `${traceId}:seed_topic`;
     const contentKey = `${traceId}:extracted_content`;
+    logger.debug(`[${traceId}] Attempting to get state for keys: ${seedTopicKey} and ${contentKey}`);
+
     const [seedTopic, extractedContent] = await Promise.all([
       state.get<string>(seedTopicKey),
       state.get<ExtractedContent[]>(contentKey),
     ]);
 
-    if (!seedTopic) {
-      throw new Error(`Seed topic not found in state for key: ${seedTopicKey}`);
+    // Log what was retrieved IMMEDIATELY after the get call
+    logger.debug(`[${traceId}] Retrieved seedTopic from state: ${seedTopic === undefined ? 'UNDEFINED' : JSON.stringify(seedTopic)}`); 
+    logger.debug(`[${traceId}] Retrieved extractedContent from state: ${extractedContent === undefined ? 'UNDEFINED' : `${extractedContent?.length ?? 0} items`}`);
+
+    // Check for undefined OR null using == null
+    if (seedTopic == null) { 
+      const reason = seedTopic === undefined ? 'undefined' : 'null';
+      logger.error(`[${traceId}] Seed topic was not usable (${reason}) in state for key: ${seedTopicKey}`);
+      throw new Error(`Seed topic not found or invalid in state for key: ${seedTopicKey}`);
     }
+    // Check for extracted content separately with the CORRECT error message
     if (!extractedContent || extractedContent.length === 0) {
-      // Decide how to handle: error out, or generate questions based only on seed topic?
-      // For now, let's require some content.
-      throw new Error(`Extracted content not found or empty in state for key: ${contentKey}`);
+      const reason = !extractedContent ? 'not found' : 'empty';
+      logger.error(`[${traceId}] Extracted content was ${reason} in state for key: ${contentKey}`);
+      throw new Error(`Extracted content not found or empty in state for key: ${contentKey}`); 
     }
+
+    logger.debug(`[${traceId}] Seed topic: "${seedTopic}"`);
+    logger.debug(`[${traceId}] Extracted content count: ${extractedContent.length}`);
 
     // 2. Prepare context for the LLM (limit size)
     // Combine titles and excerpts/truncated content from successful extractions
@@ -188,6 +221,18 @@ Based on the seed topic and the context above, generate 5-10 novel, impactful, a
     let errorMessage = 'Unknown error in question-brainstormer';
     if (error instanceof Error) errorMessage = error.message;
     logger.error(`[${traceId}] Error in question-brainstormer step: ${errorMessage}`);
-    await event.emit('workflow.error', { traceId, step: config.name, error: errorMessage });
+    
+    // Safely attempt to emit the error event
+    if (context?.event?.emit && typeof context.event.emit === 'function') {
+        try {
+            await context.event.emit('workflow.error', { traceId, step: config.name, error: errorMessage });
+        } catch (emitError: unknown) {
+            let emitErrorMessage = 'Unknown error during error emit';
+            if (emitError instanceof Error) emitErrorMessage = emitError.message;
+            logger.error(`[${traceId}] Failed to emit workflow.error event: ${emitErrorMessage}`);
+        }
+    } else {
+        logger.error(`[${traceId}] Could not emit workflow.error event because context.event.emit is unavailable.`);
+    }
   }
 };

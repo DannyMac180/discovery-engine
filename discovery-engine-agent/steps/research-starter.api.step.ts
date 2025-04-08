@@ -51,13 +51,21 @@ export const handler = async (input: ResearchStarterInput, context: any) => { //
 
   // 1. Generate a unique traceId
   const traceId = randomUUID();
-  logger.debug(`Generated traceId: ${traceId}`);
+  logger.debug(`[${traceId}] Generated traceId`); // Existing log
 
   logger.info('Received research request', { topic: body.seed_topic, traceId });
 
   // Store the initial topic in state, scoped by traceId
-  await state.set(`${traceId}:seed_topic`, body.seed_topic);
-  logger.debug(`Stored seed topic for traceId ${traceId}`);
+  const seedTopicKey = `${traceId}:seed_topic`; // Define the key explicitly
+  logger.debug(`[${traceId}] Attempting to set state for key: ${seedTopicKey}`); // <<< ADD THIS
+  try {
+    await state.set(seedTopicKey, body.seed_topic);
+    logger.debug(`[${traceId}] Successfully set state for key: ${seedTopicKey}`); // <<< MODIFY existing log slightly for clarity
+  } catch (setStateError) {
+     logger.error(`[${traceId}] Failed to set state for key ${seedTopicKey}:`, setStateError); // <<< ADD error handling for set
+     // Potentially return error response here
+     return { status: 500, body: { error: 'Failed to save initial state.' } };
+  }
 
   // Define event details
   const eventName = 'topic.seeded';
