@@ -24,9 +24,7 @@ interface ExtractedContent {
 interface CustomEventContext {
   logger: any; // Replace 'any' with specific Motia Logger type if known/available
   state: any;  // Replace 'any' with specific Motia State type if known/available
-  event: { // Use 'event' based on usage, not 'emit' like API steps
-    emit: (eventName: string, payload: any) => Promise<void>;
-  };
+  emit: (event: { topic: string; data: any }) => Promise<void>;
 }
 
 // Define the step configuration
@@ -44,7 +42,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // The handler function for the event step
 export const handler: StepHandler<typeof config> = async (payload: SearchResultsObtainedPayload, context: CustomEventContext) => {
-  const { logger, state, event } = context;
+  const { logger, state, emit } = context;
 
   logger.info(`[${payload.traceId}] Received 'search_results.obtained' event with ${payload.results.length} results.`);
   if (payload.errors && payload.errors.length > 0) {
@@ -149,9 +147,12 @@ export const handler: StepHandler<typeof config> = async (payload: SearchResults
   await state.set(stateKey, extractedContents);
   logger.debug(`[${payload.traceId}] Stored extracted content in state at key: ${stateKey}`);
 
-  await event.emit('content.extracted', {
-    traceId: payload.traceId,
-    extractedContent: extractedContents,
+  await emit({
+    topic: 'content.extracted',
+    data: {
+      traceId: payload.traceId,
+      extractedContent: extractedContents,
+    }
   });
   logger.info(`[${payload.traceId}] Emitted 'content.extracted' event.`);
 };
